@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Budget กบล. - Final Fix</title>
+    <title>Smart Budget กบล. - Dashboard</title>
+    <!-- 1. โหลด Library (ลำดับมีความสำคัญมาก) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.3/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,6 +15,8 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
         body { font-family: 'Sarabun', sans-serif; background-color: #0F0518; color: #e2e8f0; margin: 0; }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -22,23 +26,24 @@
         const { useState, useMemo, useEffect } = React;
         const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } = window.Recharts;
 
-        // --- 1. MAPPING: แก้ให้ตรงตามรูปภาพของคุณแล้ว ---
+        // --- 1. MAPPING: ชื่อต้องตรงกับหัวตารางที่ Apps Script ส่งมา ---
         const COLUMN_MAP = {
             name: "ชื่อบัญชี",
             budget68: "งบประมาณ ประจำปี 2568",
-            budget69: "งบประมาณ ประจำปี 2569",
-            // ในรูปไม่เห็นคอลัมน์ "เบิกจ่ายจริง" ผมจึงตั้งไว้เผื่อ ถ้าในชีทชื่ออื่นให้มาแก้ตรงนี้ครับ
             actual68: "เบิกจ่ายจริง ประจำปี 2568" 
         };
 
         const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxK_orAxdZ4cSA9RejZYacepg86iZp-fpGD_P-C1UJtSax40B3rqDup3_q37AViihTk/exec";
 
+        // Helper Components
         const cleanNum = (v) => {
             if (!v) return 0;
             return parseFloat(String(v).replace(/[^0-9.-]+/g, "")) || 0;
         };
 
-        const formatCurrency = (v) => new Intl.NumberFormat('th-TH').format(Math.round(v));
+        const formatCurrency = (v) => new Intl.NumberFormat('th-TH').format(Math.round(v || 0));
+
+        const Icon = ({ name, className = "" }) => <i data-lucide={name} className={`w-5 h-5 ${className}`}></i>;
 
         const KPI_LEVELS = [
             { level: 5, label: 'ดีมาก', max: 82.25, color: '#10B981' },
@@ -61,7 +66,7 @@
                         </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute top-[100px] left-1/2 -translate-x-1/2 text-center">
-                        <span className="text-4xl font-bold text-white">{safePercent.toFixed(1)}%</span>
+                        <span className="text-4xl font-bold text-white font-mono">{safePercent.toFixed(1)}%</span>
                         <p className="text-slate-500 text-[10px] uppercase mt-1">Status: {KPI_LEVELS.find(l => safePercent <= l.max)?.label || 'เกินงบ'}</p>
                     </div>
                 </div>
@@ -71,22 +76,28 @@
         function App() {
             const [sheetData, setSheetData] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
 
             useEffect(() => {
-                fetch(SHEET_API_URL).then(r => r.json()).then(d => { setSheetData(d); setLoading(false); }).catch(e => setLoading(false));
+                fetch(SHEET_API_URL)
+                    .then(r => r.json())
+                    .then(d => { setSheetData(d); setLoading(false); })
+                    .catch(e => { 
+                        console.error(e); 
+                        setError("ไม่สามารถโหลดข้อมูลได้ ตรวจสอบการ Deployment ของ Apps Script");
+                        setLoading(false); 
+                    });
             }, []);
 
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
 
             const stats = useMemo(() => {
-                if (!sheetData.length) return null;
-                
+                if (!sheetData.length) return { budget: 0, actual: 0, percent: 0 };
                 let b68 = 0, a68 = 0;
                 sheetData.forEach(row => {
                     b68 += cleanNum(row[COLUMN_MAP.budget68]);
                     a68 += cleanNum(row[COLUMN_MAP.actual68]);
                 });
-
                 return {
                     budget: b68,
                     actual: a68,
@@ -94,53 +105,88 @@
                 };
             }, [sheetData]);
 
-            if (loading) return <div className="min-h-screen bg-[#0F0518] flex items-center justify-center text-amber-500 font-bold">กำลังประมวลผลข้อมูล...</div>;
+            if (loading) return <div className="min-h-screen bg-[#0F0518] flex items-center justify-center text-amber-500 font-bold animate-pulse text-xl uppercase tracking-widest">Loading Data...</div>;
+
+            if (error) return <div className="min-h-screen bg-[#0F0518] flex items-center justify-center text-red-500 p-10 text-center">{error}</div>;
 
             return (
-                <div className="min-h-screen flex bg-[#0F0518] text-slate-200 p-10">
-                    <div className="max-w-6xl mx-auto w-full space-y-10">
-                        <header className="border-b border-white/10 pb-6">
+                <div className="min-h-screen flex bg-[#0F0518] text-slate-200">
+                    {/* Sidebar */}
+                    <aside className="w-72 bg-[#1A0B2E] border-r border-white/5 p-6 flex flex-col">
+                        <div className="flex items-center gap-4 mb-10">
+                            <div className="bg-amber-500 p-2 rounded-xl text-black"><Icon name="wallet" /></div>
+                            <h1 className="font-bold text-amber-500 text-lg uppercase tracking-tighter">Smart Budget</h1>
+                        </div>
+                        <nav className="flex-1 space-y-2">
+                            <div className="w-full flex items-center gap-4 p-4 rounded-2xl bg-purple-900/40 text-white border border-purple-500/30">
+                                <Icon name="layout-dashboard" /> 
+                                <span className="font-bold">ภาพรวมงบประมาณ</span>
+                            </div>
+                        </nav>
+                        
+                        {/* Debug Area */}
+                        <div className="mt-10 p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">ตรวจพบคอลัมน์:</p>
+                            <div className="max-h-32 overflow-y-auto scrollbar-thin text-[10px]">
+                                {sheetData.length > 0 && Object.keys(sheetData[0]).map(key => (
+                                    <div key={key} className="flex justify-between py-1 border-b border-white/5">
+                                        <span className="text-slate-400">{key}</span>
+                                        {Object.values(COLUMN_MAP).includes(key) && <span className="text-emerald-500 font-bold">MATCH</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 p-10 overflow-y-auto h-screen scrollbar-thin">
+                        <header className="border-b border-white/10 pb-6 mb-10">
                             <h1 className="text-4xl font-bold text-white tracking-tighter uppercase">Budget Dashboard</h1>
-                            <p className="text-emerald-500 text-xs mt-2 uppercase tracking-widest">● Database Connected Successfully</p>
+                            <p className="text-emerald-500 text-xs mt-2 uppercase tracking-widest">● Database Connected</p>
                         </header>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+                            {/* Summary Card */}
                             <div className="bg-gradient-to-br from-[#2E1065] to-[#1A0B2E] p-10 rounded-[40px] border border-amber-500/20 shadow-2xl">
-                                <p className="text-slate-400 text-xs uppercase mb-2">งบประมาณรวม 2568</p>
-                                <h3 className="text-3xl font-bold text-white mb-8">{formatCurrency(stats?.budget)}</h3>
-                                <p className="text-amber-500 text-xs uppercase mb-2">เบิกจ่ายจริง (Actual)</p>
-                                <h3 className="text-5xl font-bold text-white">{formatCurrency(stats?.actual)}</h3>
+                                <p className="text-slate-400 text-xs uppercase mb-2 font-bold">งบประมาณรวม 2568</p>
+                                <h3 className="text-3xl font-bold text-white mb-8 font-mono">{formatCurrency(stats.budget)}</h3>
+                                <p className="text-amber-500 text-xs uppercase mb-2 font-bold">เบิกจ่ายจริง (Actual)</p>
+                                <h3 className="text-5xl font-bold text-white font-mono">{formatCurrency(stats.actual)}</h3>
                             </div>
 
+                            {/* Gauge Chart */}
                             <div className="lg:col-span-2 bg-[#150F25] p-10 rounded-[40px] border border-white/5 text-center shadow-xl">
                                 <h3 className="text-xs font-bold text-slate-400 mb-6 uppercase tracking-widest">ระดับการเบิกจ่ายงบประมาณ</h3>
-                                <GaugeChart percent={stats?.percent} />
+                                <GaugeChart percent={stats.percent} />
                                 <div className="flex justify-center gap-2 mt-6">
                                     {KPI_LEVELS.map(l => <div key={l.level} className="text-[9px] px-3 py-1 rounded-full bg-white/5 font-bold" style={{color: l.color}}>{l.label}</div>)}
                                 </div>
                             </div>
                         </div>
 
+                        {/* Raw Table */}
                         <div className="bg-[#150F25] rounded-[30px] border border-white/5 overflow-hidden shadow-2xl">
-                            <div className="p-6 border-b border-white/5 font-bold text-amber-500 uppercase text-xs tracking-widest">ตารางข้อมูลจาก Google Sheets</div>
-                            <div className="overflow-x-auto max-h-[400px]">
-                                <table className="w-full text-left text-[12px]">
+                            <div className="p-6 border-b border-white/5 font-bold text-amber-500 uppercase text-xs tracking-widest">ข้อมูลดิบจาก Google Sheets</div>
+                            <div className="overflow-x-auto max-h-[400px] scrollbar-thin">
+                                <table className="w-full text-left text-[11px] font-mono">
                                     <thead className="bg-white/5 text-slate-400 sticky top-0">
                                         <tr>
+                                            <th className="p-4 border-b border-white/10">#</th>
                                             {sheetData[0] && Object.keys(sheetData[0]).map(k => <th key={k} className="p-4 border-b border-white/10 font-bold">{k}</th>)}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {sheetData.map((row, i) => (
                                             <tr key={i} className="hover:bg-white/5 transition-colors">
-                                                {Object.values(row).map((v, j) => <td key={j} className="p-4">{v}</td>)}
+                                                <td className="p-4 text-slate-600 font-bold">{i+1}</td>
+                                                {Object.values(row).map((v, j) => <td key={j} className="p-4 whitespace-nowrap">{v}</td>)}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </main>
                 </div>
             );
         }
