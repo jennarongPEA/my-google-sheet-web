@@ -4,37 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget Dashboard - Smart Budget กบล.</title>
-    <!-- โหลด Library พื้นฐาน (ห้ามสลับลำดับ) -->
+    
+    <!-- โหลด Library (เรียงลำดับความสำคัญ) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.3/Recharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; background-color: #0F0518; color: #e2e8f0; }
+        body { font-family: 'Sarabun', sans-serif; background-color: #0F0518; color: #e2e8f0; margin: 0; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // ดึงความสามารถจาก Library ต่างๆ ออกมาเตรียมไว้ (แทนการ import)
-        const { useState, useEffect, useMemo, useCallback } = React;
+        // แก้ไขจุดที่ผิด: ใช้ : ในการเปลี่ยนชื่อตัวแปรแทนคำว่า as
         const { 
-            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, 
-            Legend, ResponsiveContainer, Cell, LabelList, PieChart, Pie, Cell as PieCell
-        } = Recharts;
+            BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+            Tooltip: RechartsTooltip, 
+            Legend, ResponsiveContainer, Cell, LabelList, PieChart, Pie
+        } = window.Recharts;
 
-        // ฟังก์ชันช่วยจัดการตัวเลข
+        const { useState, useEffect } = React;
+
         const formatCurrency = (v) => new Intl.NumberFormat('th-TH').format(v || 0);
-        const formatK = (v) => (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v);
 
-        // --- ส่วนที่ 1: ตั้งค่า URL ของคุณ ---
+        // --- URL ของ Google Apps Script ของคุณ ---
         const SHEET_API_URL = "https://script.google.com/macros/s/AKfycby8D83VHt6lAqb3ETNFSsP88A2IdG5qVUHZkWGcnAXwMha_BifBje9UTR4xIre7BBZE/exec";
 
-        // คอมโพเนนต์เข็มไมล์ (Gauge)
         const GaugeChart = ({ percent }) => {
             const safePercent = Math.min(Math.max(percent || 0, 0), 110);
             const cx = 150, cy = 150, iR = 80, oR = 120;
@@ -52,22 +54,20 @@
                                     { value: 82, color: '#10B981' }, { value: 6, color: '#84CC16' },
                                     { value: 6, color: '#FACC15' }, { value: 6, color: '#F97316' }, { value: 10, color: '#EF4444' }
                                 ]}>
-                                { [0,1,2,3,4].map(i => <PieCell key={i} fill={['#10B981','#84CC16','#FACC15','#F97316','#EF4444'][i]} stroke="none"/>) }
+                                { [0,1,2,3,4].map(i => <Cell key={i} fill={['#10B981','#84CC16','#FACC15','#F97316','#EF4444'][i]} stroke="none"/>) }
                             </Pie>
                         </PieChart>
                     </ResponsiveContainer>
-                    <svg className="absolute top-0 left-0 w-full h-full">
-                        <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="white" strokeWidth="4" strokeLinecap="round" />
-                        <circle cx={cx} cy={cy} r="6" fill="white" />
-                        <text x={cx} y={cy - 20} textAnchor="middle" fill="white" fontSize="24" fontWeight="bold">{safePercent.toFixed(2)}%</text>
-                    </svg>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 text-center mt-4">
+                        <span className="text-3xl font-bold text-white">{safePercent.toFixed(2)}%</span>
+                        <p className="text-xs text-slate-400">การเบิกจ่ายจริง</p>
+                    </div>
                 </div>
             );
         };
 
         function App() {
             const [activeTab, setActiveTab] = useState('overview');
-            const [sidebarOpen, setSidebarOpen] = useState(true);
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(true);
 
@@ -75,17 +75,17 @@
                 fetch(SHEET_API_URL)
                     .then(r => r.json())
                     .then(d => { setData(d); setLoading(false); })
-                    .catch(e => { console.error(e); setLoading(false); });
+                    .catch(e => { console.error("Error:", e); setLoading(false); });
             }, []);
 
-            // สั่งให้ Lucide แสดงไอคอนเมื่อหน้าเว็บเปลี่ยน
+            // ให้ Lucide ทำงานเมื่อโหลดเสร็จ
             useEffect(() => { if (!loading) lucide.createIcons(); }, [loading, activeTab]);
 
             if (loading) return (
-                <div className="min-h-screen bg-[#0F0518] flex items-center justify-center">
+                <div className="min-h-screen flex items-center justify-center bg-[#0F0518]">
                     <div className="text-center">
-                        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p>กำลังเชื่อมต่อ Google Sheets...</p>
+                        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-amber-500 animate-pulse">กำลังดึงข้อมูลจาก Google Sheets...</p>
                     </div>
                 </div>
             );
@@ -93,56 +93,67 @@
             return (
                 <div className="min-h-screen flex bg-[#0F0518]">
                     {/* Sidebar */}
-                    <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} transition-all bg-[#1A0B2E] border-r border-white/10 p-4`}>
+                    <aside className="w-64 bg-[#1A0B2E] border-r border-white/10 p-6 flex flex-col">
                         <div className="flex items-center gap-3 mb-10">
                             <div className="bg-amber-500 p-2 rounded text-black"><i data-lucide="wallet"></i></div>
-                            {sidebarOpen && <h1 className="font-bold text-amber-400">Smart Budget</h1>}
+                            <h1 className="font-bold text-amber-500 text-lg">Smart Budget</h1>
                         </div>
-                        <nav className="space-y-4">
-                            <button onClick={()=>setActiveTab('overview')} className={`w-full flex items-center gap-3 p-3 rounded-lg ${activeTab==='overview'?'bg-purple-900 text-white':'hover:bg-white/5'}`}>
-                                <i data-lucide="layout-dashboard"></i> {sidebarOpen && "ภาพรวม"}
+                        <nav className="space-y-2 flex-1">
+                            <button onClick={()=>setActiveTab('overview')} className={`w-full flex items-center gap-3 p-3 rounded-xl transition ${activeTab==='overview'?'bg-purple-600 text-white shadow-lg shadow-purple-500/20':'text-slate-400 hover:bg-white/5'}`}>
+                                <i data-lucide="layout-dashboard" className="w-5 h-5"></i> ภาพรวม
                             </button>
-                            <button onClick={()=>setActiveTab('details')} className={`w-full flex items-center gap-3 p-3 rounded-lg ${activeTab==='details'?'bg-purple-900 text-white':'hover:bg-white/5'}`}>
-                                <i data-lucide="file-text"></i> {sidebarOpen && "รายการจาก Sheet"}
+                            <button onClick={()=>setActiveTab('table')} className={`w-full flex items-center gap-3 p-3 rounded-xl transition ${activeTab==='table'?'bg-purple-600 text-white shadow-lg shadow-purple-500/20':'text-slate-400 hover:bg-white/5'}`}>
+                                <i data-lucide="database" className="w-5 h-5"></i> ข้อมูลดิบจาก Sheet
                             </button>
                         </nav>
+                        <div className="text-[10px] text-slate-600 text-center mt-10">Powered by Gemini & GitHub Pages</div>
                     </aside>
 
-                    {/* Main */}
-                    <main className="flex-1 p-8 overflow-y-auto h-screen">
-                        <header className="flex justify-between mb-10">
-                            <h2 className="text-2xl font-bold">ข้อมูลเชื่อมต่อตรงจาก Google Sheets</h2>
-                            <button onClick={()=>setSidebarOpen(!sidebarOpen)} className="p-2 bg-white/5 rounded"><i data-lucide="menu"></i></button>
+                    {/* Main Content */}
+                    <main className="flex-1 p-8 overflow-y-auto">
+                        <header className="flex justify-between items-center mb-10">
+                            <h2 className="text-2xl font-bold">แดชบอร์ดงบประมาณ</h2>
+                            <div className="bg-white/5 px-4 py-2 rounded-full border border-white/10 text-xs text-slate-400">
+                                สถานะ: เชื่อมต่อสำเร็จ ({data.length} แถว)
+                            </div>
                         </header>
 
                         {activeTab === 'overview' ? (
-                            <div className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-[#150F25] p-6 rounded-2xl border border-white/5">
-                                        <h3 className="text-slate-400 mb-2">ข้อมูลล่าสุดในระบบ</h3>
-                                        <p className="text-4xl font-bold text-amber-400 font-mono">{data.length} รายการ</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="md:col-span-1 space-y-6">
+                                    <div className="bg-gradient-to-br from-purple-900 to-[#1A0B2E] p-6 rounded-2xl border border-white/10">
+                                        <p className="text-slate-400 text-sm mb-1">จำนวนรายการเบิกจ่าย</p>
+                                        <h3 className="text-4xl font-bold text-white font-mono">{data.length}</h3>
                                     </div>
                                     <div className="bg-[#150F25] p-6 rounded-2xl border border-white/5">
+                                        <p className="text-slate-400 text-sm mb-4">เปอร์เซ็นต์การใช้ไป (ตัวอย่าง)</p>
                                         <GaugeChart percent={52.74} />
                                     </div>
                                 </div>
+                                <div className="md:col-span-2 bg-[#150F25] p-6 rounded-2xl border border-white/5 flex items-center justify-center">
+                                    <p className="text-slate-500 italic">กราฟวิเคราะห์อื่นๆ จะปรากฏที่นี่เมื่อคุณเชื่อมคอลัมน์ใน Sheet เรียบร้อยแล้ว</p>
+                                </div>
                             </div>
                         ) : (
-                            <div className="bg-[#150F25] rounded-xl border border-white/10 overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-white/5 text-slate-400">
-                                        <tr>
-                                            { data[0] && Object.keys(data[0]).map(k => <th key={k} className="p-4 text-sm font-normal">{k}</th>) }
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        { data.map((row, i) => (
-                                            <tr key={i} className="hover:bg-white/5">
-                                                { Object.values(row).map((v, j) => <td key={j} className="p-4 text-sm">{v}</td>) }
+                            <div className="bg-[#150F25] rounded-2xl border border-white/10 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-white/5 text-slate-400">
+                                            <tr>
+                                                <th className="p-4 border-b border-white/10">#</th>
+                                                { data[0] && Object.keys(data[0]).map(k => <th key={k} className="p-4 border-b border-white/10 font-medium">{k}</th>) }
                                             </tr>
-                                        )) }
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            { data.map((row, i) => (
+                                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                    <td className="p-4 text-slate-600">{i+1}</td>
+                                                    { Object.values(row).map((v, j) => <td key={j} className="p-4">{v}</td>) }
+                                                </tr>
+                                            )) }
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
                     </main>
