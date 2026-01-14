@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Budget กบล. - Dashboard</title>
-    <!-- 1. Load Libraries (CDN) -->
+    
+    <!-- 1. โหลด Library พื้นฐาน (ห้ามสลับลำดับ) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
@@ -12,9 +13,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; background-color: #0F0518; margin: 0; }
+        body { font-family: 'Sarabun', sans-serif; background-color: #0F0518; color: #e2e8f0; margin: 0; }
         .scrollbar-thin::-webkit-scrollbar { width: 5px; }
         .scrollbar-thin::-webkit-scrollbar-track { background: #1A0B2E; }
         .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
@@ -25,21 +27,18 @@
 
     <script type="text/babel">
         // --- 2. SETUP ENVIRONMENT ---
-        const { useState, useMemo, useCallback, useEffect } = React;
+        const { useState, useMemo, useEffect } = React;
         const { 
             BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, 
             Legend, ResponsiveContainer, Cell, LabelList, PieChart, Pie
         } = window.Recharts;
 
-        // ดึง Icon จาก Lucide (แบบ CDN ต้องเรียกผ่าน lucide.icons)
-        const Icon = ({ name, size = 20, className = "" }) => {
-            const IconComponent = lucide[name] || lucide.HelpCircle;
-            return <IconComponent size={size} className={className} />;
-        };
+        // แก้ไขวิธีเรียก Icon: ใช้ <i> tag แทน Component เพื่อเลี่ยง Error #130
+        const Icon = ({ name, className = "" }) => (
+            <i data-lucide={name} className={`w-5 h-5 ${className}`}></i>
+        );
 
-        // --- 3. UTILS & DATA จากต้นฉบับคุณ ---
         const formatCurrency = (v) => new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 }).format(v || 0);
-        const formatK = (v) => (v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v);
 
         const KPI_LEVELS = [
             { level: 5, label: 'ดีมาก', maxPercent: 82.25, color: '#10B981' }, 
@@ -49,12 +48,10 @@
             { level: 1, label: 'ต้องปรับปรุง', maxPercent: 105.92, color: '#EF4444' }, 
         ];
 
-        const DEPT_COLORS = ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#EF4444'];
-
-        // --- เปลี่ยน URL ตรงนี้ให้เป็นของคุณ ---
+        // --- URL ของ Google Apps Script ของคุณ ---
         const SHEET_API_URL = "https://script.google.com/macros/s/AKfycby8D83VHt6lAqb3ETNFSsP88A2IdG5qVUHZkWGcnAXwMha_BifBje9UTR4xIre7BBZE/exec";
 
-        // --- 4. COMPONENTS (ยกมาจากต้นฉบับคุณทั้งหมด) ---
+        // --- 3. COMPONENTS ---
 
         const GaugeChart = ({ percent }) => {
             const safePercent = Math.min(Math.max(percent || 0, 0), 110); 
@@ -79,20 +76,20 @@
                     </ResponsiveContainer>
                     <div className="absolute top-[100px] left-1/2 -translate-x-1/2 text-center">
                         <span className="text-3xl font-bold text-white font-mono">{safePercent.toFixed(2)}%</span>
-                        <p className="text-slate-400 text-xs uppercase">การเบิกจ่ายจริง</p>
+                        <p className="text-slate-400 text-[10px] uppercase">การเบิกจ่ายจริง</p>
                     </div>
                 </div>
             );
         };
 
-        const OverviewSection = ({ title, summaryData, detailData }) => {
+        const OverviewSection = ({ title, summaryData }) => {
             const chartData = [
-                { name: 'งบประมาณ', value: 100, realValue: summaryData.budget, color: '#475569' },
-                { name: 'ใช้จริง', value: summaryData.percent, realValue: summaryData.actual, color: summaryData.percent > 82.25 ? '#F59E0B' : '#8B5CF6' }
+                { name: 'งบประมาณ', value: 100, color: '#475569' },
+                { name: 'ใช้จริง', value: summaryData.percent, color: summaryData.percent > 82.25 ? '#F59E0B' : '#8B5CF6' }
             ];
 
             return (
-                <div className="space-y-8 animate-in fade-in duration-500">
+                <div className="space-y-8">
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                         <div className="bg-gradient-to-br from-[#2E1065] to-[#1A0B2E] border border-amber-500/30 rounded-2xl p-8 shadow-xl">
                             <h3 className="text-purple-300 text-lg font-bold mb-6 uppercase">{title}</h3>
@@ -111,7 +108,6 @@
                                             <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} />
                                             <Bar dataKey="value" barSize={40} radius={[5, 5, 0, 0]}>
                                                 {chartData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                                                <LabelList dataKey="value" position="top" fill="#fff" fontSize={12} formatter={v=>v.toFixed(1)+'%'} />
                                             </Bar>
                                         </BarChart>
                                     </ResponsiveContainer>
@@ -120,15 +116,15 @@
                         </div>
                         <div className="xl:col-span-2 bg-[#150F25] border border-slate-800 rounded-2xl p-8 shadow-xl text-center">
                             <h3 className="text-xl font-bold text-white mb-6 flex items-center justify-center gap-2">
-                                <Icon name="Target" className="text-emerald-500" /> เกณฑ์วัดผล (KPI Gauge)
+                                <Icon name="target" className="text-emerald-500" /> เกณฑ์วัดผล (KPI Gauge)
                             </h3>
                             <GaugeChart percent={summaryData.percent} />
                             <div className="grid grid-cols-5 gap-2 mt-8">
                                 {KPI_LEVELS.map(l => (
-                                    <div key={l.level} className="p-2 rounded bg-white/5 border border-white/5">
+                                    <div key={l.level} className="p-2 rounded bg-white/5">
                                         <div className="w-full h-1 mb-2 rounded" style={{backgroundColor: l.color}}></div>
-                                        <div className="text-[10px] text-slate-400">Lv.{l.level}</div>
-                                        <div className="text-xs font-bold text-slate-200">{l.label}</div>
+                                        <div className="text-[10px] text-slate-500">Lv.{l.level}</div>
+                                        <div className="text-[11px] font-bold text-slate-200">{l.label}</div>
                                     </div>
                                 ))}
                             </div>
@@ -138,13 +134,14 @@
             );
         };
 
-        // --- 5. MAIN APP ---
-        function BudgetDashboardV30() {
+        // --- 4. MAIN APP ---
+        function App() {
             const [activeTab, setActiveTab] = useState('overview1');
             const [sidebarOpen, setSidebarOpen] = useState(true);
             const [sheetData, setSheetData] = useState([]);
             const [loading, setLoading] = useState(true);
 
+            // ดึงข้อมูลจาก Sheet
             useEffect(() => {
                 fetch(SHEET_API_URL)
                     .then(r => r.json())
@@ -152,40 +149,44 @@
                     .catch(e => { console.error(e); setLoading(false); });
             }, []);
 
-            // สำหรับ Lucide
-            useEffect(() => { lucide.createIcons(); }, [loading, activeTab, sidebarOpen]);
+            // สั่งให้ Lucide แปลงไอคอนทุกครั้งที่ render
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
 
             const menuItems = [
-                { id: 'overview1', label: '1. สรุปภาพรวม (7 ประเภท)', icon: 'LayoutDashboard', sub: 'ปี 2568' },
-                { id: 'overview2', label: '2. ค่าใช้จ่ายดำเนินงาน', icon: 'Briefcase', sub: 'ปี 2568' },
-                { id: 'comparison', label: '3. เปรียบเทียบ 68 vs 69', icon: 'ArrowRightLeft', sub: 'วิเคราะห์แนวโน้ม' },
-                { id: 'department', label: '4. วิเคราะห์แยกแผนก', icon: 'Building2', sub: 'FBL3N Data' },
+                { id: 'overview1', label: '1. สรุปภาพรวม (7 ประเภท)', icon: 'layout-dashboard', sub: 'ปี 2568' },
+                { id: 'overview2', label: '2. ค่าใช้จ่ายดำเนินงาน', icon: 'briefcase', sub: 'ปี 2568' },
+                { id: 'comparison', label: '3. เปรียบเทียบ 68 vs 69', icon: 'arrow-right-left', sub: 'วิเคราะห์แนวโน้ม' },
+                { id: 'department', label: '4. วิเคราะห์แยกแผนก', icon: 'building-2', sub: 'FBL3N Data' },
             ];
 
-            // Mock สรุป (ในอนาคตคุณสามารถใช้ sheetData คำนวณได้)
+            // ข้อมูลสำหรับแสดงผล (Mock จากที่คุณออกแบบไว้)
             const summary = { budget: 2676700, actual: 1411673, percent: 52.74 };
 
             if (loading) return (
-                <div className="min-h-screen bg-[#0F0518] flex items-center justify-center">
+                <div className="min-h-screen bg-[#0F0518] flex items-center justify-center text-amber-500">
                     <div className="text-center">
                         <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-amber-500 animate-pulse">กำลังโหลดข้อมูลจาก Google Sheet...</p>
+                        <p className="animate-pulse">กำลังเชื่อมต่อฐานข้อมูล Google Sheets...</p>
                     </div>
                 </div>
             );
 
             return (
-                <div className="min-h-screen flex bg-[#0F0518] text-slate-200 overflow-hidden">
+                <div className="min-h-screen flex bg-[#0F0518] text-slate-200 overflow-hidden font-['Sarabun']">
                     {/* SIDEBAR */}
-                    <aside className={`transition-all duration-300 bg-[#1A0B2E] border-r border-amber-500/10 ${sidebarOpen ? 'w-72' : 'w-20'}`}>
+                    <aside className={`transition-all duration-300 bg-[#1A0B2E] border-r border-white/5 ${sidebarOpen ? 'w-72' : 'w-20'}`}>
                         <div className="p-6 flex items-center gap-4 border-b border-white/5">
-                            <div className="bg-amber-500 p-2 rounded-lg text-black"><Icon name="Wallet" /></div>
-                            {sidebarOpen && <h1 className="font-bold text-amber-400 text-lg">Smart Budget</h1>}
+                            <div className="bg-amber-500 p-2 rounded-lg text-black shadow-lg"><Icon name="wallet" /></div>
+                            {sidebarOpen && <h1 className="font-bold text-amber-400 text-lg whitespace-nowrap">Smart Budget กบล.</h1>}
                         </div>
                         <nav className="p-4 space-y-2">
                             {menuItems.map(item => (
                                 <button key={item.id} onClick={() => setActiveTab(item.id)}
-                                    className={`w-full flex items-center gap-4 p-3 rounded-xl transition ${activeTab === item.id ? 'bg-purple-900/50 border border-amber-500/30 text-white' : 'hover:bg-white/5 text-slate-400'}`}>
+                                    className={`w-full flex items-center gap-4 p-3 rounded-xl transition ${activeTab === item.id ? 'bg-purple-900/40 border border-purple-500/30 text-white' : 'hover:bg-white/5 text-slate-400'}`}>
                                     <Icon name={item.icon} />
                                     {sidebarOpen && (
                                         <div className="text-left">
@@ -203,33 +204,42 @@
                         <header className="flex justify-between items-end mb-10 border-b border-white/5 pb-6">
                             <div>
                                 <h2 className="text-3xl font-bold text-white">{menuItems.find(m=>m.id===activeTab)?.label}</h2>
-                                <p className="text-slate-400 mt-2">ระบบติดตามข้อมูลงบประมาณ กบล. (เชื่อมต่ออัตโนมัติ)</p>
+                                <p className="text-slate-400 mt-2">ระบบติดตามข้อมูลงบประมาณเชิงลึก (เชื่อมต่อ Google Sheet)</p>
                             </div>
                             <div className="flex items-center gap-2 bg-purple-900/30 px-4 py-2 rounded-full border border-purple-500/30 text-purple-300 text-sm">
-                                <Icon name="Calendar" size={16} /> ข้อมูลล่าสุด {sheetData.length} รายการ
+                                <Icon name="calendar" /> {new Date().toLocaleDateString('th-TH')}
                             </div>
                         </header>
 
-                        {/* แสดงเนื้อหาตาม Tab */}
-                        {activeTab === 'overview1' && <OverviewSection title="สรุปงบประมาณ 7 ประเภท" summaryData={summary} detailData={[]} />}
+                        {activeTab === 'overview1' && <OverviewSection title="สรุปงบประมาณ 7 ประเภท" summaryData={summary} />}
                         
-                        {/* ตารางข้อมูลดิบ (สำรองไว้ดูว่า Sheet มาจริงไหม) */}
-                        <div className="mt-20">
-                            <h3 className="text-lg font-bold mb-4 text-amber-500">ข้อมูลดิบจาก Google Sheets:</h3>
-                            <div className="bg-[#150F25] rounded-xl border border-white/5 overflow-x-auto text-[12px]">
-                                <table className="w-full text-left">
-                                    <thead className="bg-white/5">
-                                        <tr>
-                                            {sheetData[0] && Object.keys(sheetData[0]).map(k => <th key={k} className="p-3 border-b border-white/5">{k}</th>)}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5 text-slate-400">
-                                        {sheetData.slice(0, 5).map((row, i) => (
-                                            <tr key={i}>{Object.values(row).map((v, j) => <td key={j} className="p-3">{v}</td>)}</tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                <p className="p-3 text-center text-slate-600">แสดงผล 5 รายการแรกเพื่อประหยัดพื้นที่...</p>
+                        {/* ส่วนแสดงตารางข้อมูลจริงจาก Sheet */}
+                        <div className="mt-12">
+                            <div className="flex items-center gap-2 mb-4 text-amber-500 font-bold">
+                                <Icon name="database" /> <span>ข้อมูลล่าสุดจาก Google Sheets ({sheetData.length} รายการ)</span>
+                            </div>
+                            <div className="bg-[#150F25] rounded-xl border border-white/5 overflow-hidden shadow-2xl">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-[12px]">
+                                        <thead className="bg-white/5 text-slate-300 uppercase">
+                                            <tr>
+                                                <th className="p-4 border-b border-white/5">#</th>
+                                                {sheetData[0] && Object.keys(sheetData[0]).map(k => <th key={k} className="p-4 border-b border-white/5 font-medium">{k}</th>)}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5 text-slate-400">
+                                            {sheetData.slice(0, 10).map((row, i) => (
+                                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                    <td className="p-4 text-slate-600">{i+1}</td>
+                                                    {Object.values(row).map((v, j) => <td key={j} className="p-4">{v}</td>)}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="p-3 bg-white/5 text-center text-[10px] text-slate-500 italic">
+                                    แสดงข้อมูล 10 รายการล่าสุด เพื่อความรวดเร็วในการแสดงผล
+                                </div>
                             </div>
                         </div>
                     </main>
@@ -238,7 +248,7 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<BudgetDashboardV30 />);
+        root.render(<App />);
     </script>
 </body>
 </html>
